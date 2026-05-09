@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
+        max_tokens: 1024,
         messages: [{ role: 'user', content: prompt.trim() }],
       }),
     })
@@ -36,12 +36,13 @@ export default async function handler(req, res) {
     const data = await response.json()
     const text = data.content?.[0]?.text ?? ''
 
-    const cleaned = text.trim()
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/```\s*$/i, '')
-
-    const parsed = JSON.parse(cleaned)
+    // Extract the JSON object robustly — model sometimes adds text before/after
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start === -1 || end === -1) {
+      return res.status(500).json({ error: 'Model did not return valid JSON' })
+    }
+    const parsed = JSON.parse(text.slice(start, end + 1))
     return res.status(200).json(parsed)
   } catch (e) {
     return res.status(500).json({ error: e.message || 'Failed to analyze' })
